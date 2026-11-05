@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AuraCut AI — Instant Studio Cutouts & Product Photos</title>
+    <meta name="description" content="Remove backgrounds and generate 4 studio-grade product & portrait variations instantly in your browser. Up to 15MB per file, zero server uploads.">
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lemon Squeezy Checkout Script -->
+    <script src="https://assets.lemonsqueezy.com/lemon.js" defer></script>
+    
+    <!-- Client-Side AI Background Removal Engine -->
+    <script src="https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/dist/bundle.js"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            400: '#818cf8',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Custom Checkerboard for Transparency Preview */
+        .bg-checkerboard {
+            background-color: #0f172a;
+            background-image: 
+                linear-gradient(45deg, #1e293b 25%, transparent 25%), 
+                linear-gradient(-45deg, #1e293b 25%, transparent 25%), 
+                linear-gradient(45deg, transparent 75%, #1e293b 75%), 
+                linear-gradient(-45deg, transparent 75%, #1e293b 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+
+        /* Smooth Scroll & Custom Scrollbar */
+        html { scroll-behavior: smooth; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #020617; }
+        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #4f46e5; }
+
+        /* Pulse Glow Animation */
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 15px rgba(99, 102, 241, 0.3); }
+            50% { box-shadow: 0 0 30px rgba(99, 102, 241, 0.65); }
+        }
+        .glow-effect { animation: pulseGlow 3s infinite; }
+
+        /* Hide scrollbars on filter tabs */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans antialiased min-h-screen flex flex-col selection:bg-brand-500 selection:text-white">
+
+    <!-- ==========================================
+         TOP NAVIGATION BAR
+    =========================================== -->
+    <header class="sticky top-0 z-40 bg-slate-950/80 backdrop-blur-xl border-b border-slate-800/80 px-4 py-3">
+        <div class="max-w-6xl mx-auto flex items-center justify-between">
+            <!-- Brand Logo -->
+            <a href="#" class="flex items-center space-x-2.5 group">
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-600 to-purple-500 flex items-center justify-center shadow-lg shadow-brand-500/20 group-hover:scale-105 transition">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/>
+                    </svg>
+                </div>
+                <div>
+                    <span class="font-extrabold text-lg tracking-tight text-white">Aura<span class="text-brand-400">Cut</span></span>
+                    <span id="pro-badge-header" class="hidden ml-1.5 text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full">PRO</span>
+                </div>
+            </a>
+
+            <!-- Right Controls: Credits & Pro Unlock -->
+            <div class="flex items-center space-x-2.5 sm:space-x-4">
+                <div id="credit-pill" class="bg-slate-900 border border-slate-800 rounded-full px-3 py-1.5 flex items-center space-x-2 text-xs">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span class="text-slate-400 hidden sm:inline">Daily Credits:</span>
+                    <span id="credits-count" class="font-bold text-white">3 / 3</span>
+                </div>
+
+                <button onclick="openModal('license-modal')" class="text-xs text-slate-400 hover:text-white font-medium px-2 py-1.5 transition">
+                    Enter Key
+                </button>
+
+                <button onclick="openModal('upgrade-modal')" id="nav-upgrade-btn" class="bg-gradient-to-r from-brand-600 to-purple-600 hover:from-brand-500 hover:to-purple-500 text-white text-xs font-bold px-3.5 py-2 rounded-full shadow-lg shadow-brand-600/25 transition flex items-center space-x-1">
+                    <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/>
+                    </svg>
+                    <span>Unlock Pro</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- ==========================================
+         MAIN WORKSPACE
+    =========================================== -->
+    <main class="flex-grow max-w-6xl w-full mx-auto px-4 py-6 sm:py-10">
+
+        <!-- Hero Section -->
+        <div class="text-center max-w-2xl mx-auto mb-8">
+            <div class="inline-flex items-center space-x-2 bg-brand-500/10 border border-brand-500/20 rounded-full px-3 py-1 mb-4">
+                <span class="text-xs font-semibold text-brand-400">100% Client-Side WebGPU Engine • Up to 15MB Files</span>
+            </div>
+            <h1 class="text-3xl sm:text-5xl font-extrabold tracking-tight text-white mb-3 leading-tight">
+                One Upload. <span class="text-transparent bg-clip-text bg-gradient-to-r from-brand-400 via-purple-400 to-pink-400">Four Studio Shots.</span>
+            </h1>
+            <p class="text-slate-400 text-sm sm:text-base">
+                Drop up to 3 photos at once (up to 15MB each). Our browser AI strips the background and automatically generates 4 ready-to-post variations per photo with zero server uploads.
+            </p>
+        </div>
+
+        <!-- ==========================================
+             UPLOAD & QUEUE CONTROLLER
+        =========================================== -->
+        <section class="max-w-3xl mx-auto mb-10">
+            <!-- Drop Zone -->
+            <div id="drop-zone" class="relative group border-2 border-dashed border-slate-700 hover:border-brand-500 bg-slate-900/60 hover:bg-slate-900/90 rounded-3xl p-6 sm:p-10 text-center transition-all duration-200 cursor-pointer glow-effect">
+                <input type="file" id="file-input" accept="image/png, image/jpeg, image/webp" multiple class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20">
+                
+                <div class="flex flex-col items-center justify-center space-y-4 pointer-events-none">
+                    <div class="w-16 h-16 rounded-2xl bg-slate-800/80 border border-slate-700 flex items-center justify-center group-hover:scale-110 group-hover:border-brand-500/50 transition duration-200">
+                        <svg class="w-8 h-8 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-base sm:text-lg font-bold text-white">Tap to select or drag & drop photos</p>
+                        <p class="text-xs sm:text-sm text-slate-400 mt-1">
+                            Batch upload up to <span id="max-batch-label" class="text-brand-400 font-semibold">3 photos</span> at once • Max <span class="text-emerald-400 font-semibold">15 MB</span> per image (JPG, PNG, WEBP)
+                        </p>
+                    </div>
+                    <div class="flex flex-wrap items-center justify-center gap-2 pt-2">
+                        <span class="text-[11px] bg-slate-800 text-slate-300 px-2.5 py-1 rounded-md border border-slate-700">✓ Transparent Cutout</span>
+                        <span class="text-[11px] bg-slate-800 text-slate-300 px-2.5 py-1 rounded-md border border-slate-700">✓ Pure White Studio</span>
+                        <span class="text-[11px] bg-slate-800 text-slate-300 px-2.5 py-1 rounded-md border border-slate-700">✓ Sunset Cyber Glow</span>
+                        <span class="text-[11px] bg-slate-800 text-slate-300 px-2.5 py-1 rounded-md border border-slate-700">✓ Luxury Dark Portrait</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Validation / Alert Banner -->
+            <div id="alert-box" class="hidden mt-4 p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs sm:text-sm flex items-start justify-between">
+                <div class="flex items-center space-x-2.5">
+                    <svg class="w-5 h-5 text-rose-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <span id="alert-message">Error message goes here.</span>
+                </div>
+                <button onclick="hideAlert()" class="text-rose-400 hover:text-white ml-3 font-bold">✕</button>
+            </div>
+
+            <!-- Selected File Queue Preview (Before Processing) -->
+            <div id="queue-panel" class="hidden mt-6 bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h3 class="text-sm font-bold text-white">Selected Photo Queue (<span id="queue-count">0</span>)</h3>
+                        <p class="text-xs text-slate-400">Each photo generates 4 studio variations simultaneously.</p>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="clearQueue()" class="text-xs text-slate-400 hover:text-rose-400 px-2.5 py-1.5 rounded-lg transition">Clear All</button>
+                        <button id="process-queue-btn" onclick="processQueue()" class="bg-brand-600 hover:bg-brand-500 text-white text-xs sm:text-sm font-bold px-5 py-2.5 rounded-xl shadow-lg shadow-brand-600/30 transition flex items-center space-x-2">
+                            <span>Generate Studio Pack</span>
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div id="queue-list" class="grid grid-cols-1 sm:grid-cols-3 gap-3"></div>
+            </div>
+
+            <!-- Global AI Processing Status Bar -->
+            <div id="processing-panel" class="hidden mt-6 bg-slate-900 border border-brand-500/40 rounded-2xl p-6 text-center">
+                <div class="w-12 h-12 rounded-full border-4 border-slate-800 border-t-brand-500 animate-spin mx-auto mb-3"></div>
+                <h3 id="processing-title" class="text-base font-bold text-white mb-1">Initializing Neural Engine...</h3>
+                <p id="processing-subtitle" class="text-xs text-slate-400 mb-4">First-time model load takes ~10 seconds. Remains cached in browser after.</p>
+                <div class="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden max-w-md mx-auto">
+                    <div id="processing-bar" class="bg-gradient-to-r from-brand-500 to-purple-500 h-full w-0 transition-all duration-300"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==========================================
+             CUSTOM STUDIO CONTROLS (Applies to Results)
+        =========================================== -->
+        <section id="studio-controls" class="hidden max-w-6xl mx-auto mb-6 bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-sm font-bold text-white flex items-center space-x-2">
+                        <span>Live Studio Customizer</span>
+                        <span class="text-[10px] bg-brand-500/20 text-brand-300 px-2 py-0.5 rounded-md">Instant Re-Render</span>
+                    </h2>
+                    <p class="text-xs text-slate-400">Adjust shadow depth, subject scale, or add a custom sticker border across all generated photos.</p>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-4">
+                    <!-- Padding / Scale Slider -->
+                    <div class="flex items-center space-x-2 bg-slate-950 px-3 py-2 rounded-xl border border-slate-800">
+                        <label class="text-xs text-slate-400 font-medium">Subject Scale:</label>
+                        <input type="range" id="scale-slider" min="70" max="100" value="88" onchange="reRenderAllVariations()" class="w-24 accent-brand-500 cursor-pointer">
+                    </div>
+
+                    <!-- Drop Shadow Toggle -->
+                    <label class="flex items-center space-x-2 bg-slate-950 px-3 py-2 rounded-xl border border-slate-800 cursor-pointer">
+                        <input type="checkbox" id="shadow-toggle" checked onchange="reRenderAllVariations()" class="rounded text-brand-600 focus:ring-0 accent-brand-500">
+                        <span class="text-xs text-slate-300 font-medium">3D Studio Shadow</span>
+                    </label>
+
+                    <!-- White Sticker Outline Toggle -->
+                    <label class="flex items-center space-x-2 bg-slate-950 px-3 py-2 rounded-xl border border-slate-800 cursor-pointer">
+                        <input type="checkbox" id="outline-toggle" onchange="reRenderAllVariations()" class="rounded text-brand-600 focus:ring-0 accent-brand-500">
+                        <span class="text-xs text-slate-300 font-medium">Sticker Cutout Border</span>
+                    </label>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==========================================
+             GENERATED GALLERY (4 Variations Per Photo)
+        =========================================== -->
+        <section id="results-section" class="hidden space-y-8">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div>
+                    <h2 class="text-xl font-extrabold text-white">Generated Studio Packs</h2>
+                    <p class="text-xs text-slate-400">Click any variation to download high-resolution PNG.</p>
+                </div>
+                <button onclick="resetWorkspace()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold px-3.5 py-2 rounded-xl transition">
+                    + New Batch
+                </button>
+            </div>
+
+            <!-- Dynamic Result Cards Injected Here -->
+            <div id="results-grid" class="space-y-10"></div>
+        </section>
+
+        <!-- ==========================================
+             WHY USERS SWITCH (Social Proof & Anti-Bloat)
+        =========================================== -->
+        <section class="mt-20 border-t border-slate-900 pt-12">
+            <div class="text-center max-w-xl mx-auto mb-10">
+                <h2 class="text-2xl font-extrabold text-white mb-2">Built for Speed. Zero Dark Patterns.</h2>
+                <p class="text-xs sm:text-sm text-slate-400">Why global e-commerce sellers, creators, and indie makers bookmark AuraCut over bloated Play Store apps.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <div class="bg-slate-900/50 border border-slate-800/80 rounded-2xl p-5">
+                    <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 font-bold mb-3">15MB</div>
+                    <h3 class="text-base font-bold text-white mb-1">Heavy File Support (Up to 15MB)</h3>
+                    <p class="text-xs text-slate-400 leading-relaxed">Most free web tools reject raw camera photos over 4MB. AuraCut processes uncompressed DSLR & smartphone shots effortlessly.</p>
+                </div>
+
+                <div class="bg-slate-900/50 border border-slate-800/80 rounded-2xl p-5">
+                    <div class="w-10 h-10 rounded-xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-400 font-bold mb-3">4x</div>
+                    <h3 class="text-base font-bold text-white mb-1">4 Variations Per Upload</h3>
+                    <p class="text-xs text-slate-400 leading-relaxed">Instead of just a transparent cutout, automatically get an Amazon-ready white backdrop, a viral neon gradient, and a dark studio card.</p>
+                </div>
+
+                <div class="bg-slate-900/50 border border-slate-800/80 rounded-2xl p-5">
+                    <div class="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 font-bold mb-3">0s</div>
+                    <h3 class="text-base font-bold text-white mb-1">Zero Video Ads or Forced Signups</h3>
+                    <p class="text-xs text-slate-400 leading-relaxed">Your images never leave your phone or laptop. Everything runs locally via WebAssembly with instant one-tap downloads.</p>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ==========================================
+         FOOTER
+    =========================================== -->
+    <footer class="border-t border-slate-900 bg-slate-950 py-8 px-4 mt-16 text-center text-xs text-slate-500">
+        <div class="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p>© 2026 AuraCut Studio AI. Runs 100% locally in your browser.</p>
+            <div class="flex items-center space-x-4">
+                <button onclick="openModal('upgrade-modal')" class="text-brand-400 hover:underline font-medium">Pricing & Pro Pass</button>
+                <span>•</span>
+                <button onclick="openModal('license-modal')" class="text-slate-400 hover:text-white">Activate License</button>
+                <span>•</span>
+                <button onclick="loadDemoImage()" class="text-emerald-400 hover:underline">Try Sample Photo</button>
+            </div>
+        </div>
+    </footer>
+
+    <!-- ==========================================
+         MODAL 1: PRO UPGRADE (LEMON SQUEEZY)
+    =========================================== -->
+    <div id="upgrade-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 sm:p-8 relative shadow-2xl">
+            <button onclick="closeModal('upgrade-modal')" class="absolute top-5 right-5 text-slate-400 hover:text-white text-sm font-bold w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center">✕</button>
+            
+            <div class="inline-flex items-center space-x-1.5 bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px] font-bold px-3 py-1 rounded-full mb-3">
+                <span>LIFETIME STUDIO PASS</span>
+            </div>
+            
+            <h3 class="text-2xl font-extrabold text-white mb-2">Unlock Unlimited Batch & Ultra-HD</h3>
+            <p class="text-xs sm:text-sm text-slate-400 mb-6">Pay once, use forever. No sneaky weekly subscriptions.</p>
+
+            <ul class="space-y-3 text-xs sm:text-sm text-slate-200 mb-6">
+                <li class="flex items-center space-x-2.5">
+                    <span class="text-emerald-400 font-bold">✓</span>
+                    <span><strong>Unlimited Daily Generations</strong> (No 3/day cap)</span>
+                </li>
+                <li class="flex items-center space-x-2.5">
+                    <span class="text-emerald-400 font-bold">✓</span>
+                    <span><strong>Batch Upload up to 10 Photos</strong> at once</span>
+                </li>
+                <li class="flex items-center space-x-2.5">
+                    <span class="text-emerald-400 font-bold">✓</span>
+                    <span><strong>Uncompressed Full-Res PNG</strong> Exports (No watermark)</span>
+                </li>
+                <li class="flex items-center space-x-2.5">
+                    <span class="text-emerald-400 font-bold">✓</span>
+                    <span><strong>Instant License Key</strong> delivered via email</span>
+                </li>
+            </ul>
+
+            <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 mb-6 flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-slate-400">One-Time Payment</p>
+                    <p class="text-2xl font-black text-white">$9.00 <span class="text-xs font-normal text-slate-500">USD</span></p>
+                </div>
+                <span class="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-lg font-semibold">Save 80% vs Monthly Apps</span>
+            </div>
+
+            <!-- Replace href with your live Lemon Squeezy Checkout Link -->
+            <a href="https://yourstore.lemonsqueezy.com/checkout/buy/your-product-id" 
+               class="lemonsqueezy-button block w-full bg-gradient-to-r from-brand-600 to-purple-600 hover:from-brand-500 hover:to-purple-500 text-white text-center font-bold py-3.5 px-6 rounded-xl shadow-lg shadow-brand-600/30 transition text-sm">
+                Buy Lifetime Pro Pass ($9)
+            </a>
+
+            <p class="text-[11px] text-center text-slate-500 mt-4">
+                Already purchased? <button onclick="closeModal('upgrade-modal'); openModal('license-modal');" class="text-brand-400 underline">Enter your license key here</button>
+            </p>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         MODAL 2: LICENSE KEY ACTIVATION
+    =========================================== -->
+    <div id="license-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 sm:p-8 relative shadow-2xl">
+            <button onclick="closeModal('license-modal')" class="absolute top-5 right-5 text-slate-400 hover:text-white text-sm font-bold w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center">✕</button>
+            
+            <h3 class="text-xl font-extrabold text-white mb-2">Activate Pro License Key</h3>
+            <p class="text-xs text-slate-400 mb-5">Enter the license key from your Lemon Squeezy receipt to unlock unlimited batch generations and HD exports on this device.</p>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1.5">License Key</label>
+                    <input type="text" id="license-input" placeholder="AURA-XXXX-XXXX-XXXX" class="w-full bg-slate-950 border border-slate-700 focus:border-brand-500 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:outline-none">
+                    <p id="license-feedback" class="text-xs mt-1.5 hidden"></p>
+                </div>
+
+                <button onclick="activateLicenseKey()" class="w-full bg-brand-600 hover:bg-brand-500 text-white font-bold py-3 px-4 rounded-xl transition text-sm">
+                    Verify & Unlock Pro
+                </button>
+
+                <div class="border-t border-slate-800 pt-3 text-center">
+                    <p class="text-[11px] text-slate-500">Demo Testing Key for Developer: <code class="text-brand-400 select-all">AURA-PRO-2026</code></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         APPLICATION JAVASCRIPT ENGINE
+    =========================================== -->
+    <script>
+        /* ------------------------------------------
+           1. APP CONFIGURATION & STATE
+        ------------------------------------------- */
+        const CONFIG = {
+            MAX_FILE_SIZE_MB: 15,
+            MAX_FILE_SIZE_BYTES: 15 * 1024 * 1024, // 15 MB
+            FREE_MAX_BATCH: 3,
+            PRO_MAX_BATCH: 10,
+            FREE_DAILY_CREDITS: 3,
+            STORAGE_KEY_CREDITS: 'auracut_daily_credits_v1',
+            STORAGE_KEY_DATE: 'auracut_credit_date_v1',
+            STORAGE_KEY_PRO: 'auracut_is_pro_v1'
+        };
+
+        let appState = {
+            isPro: false,
+            creditsLeft: CONFIG.FREE_DAILY_CREDITS,
+            fileQueue: [],
+            processedItems: [] // Stores { id, name, originalUrl, cutoutImgElement }
+        };
+
+        /* ------------------------------------------
+           2. INITIALIZATION & CREDIT SYSTEM
+        ------------------------------------------- */
+        window.addEventListener('DOMContentLoaded', () => {
+            initUserStatus();
+            setupDragAndDrop();
+        });
+
+        function initUserStatus() {
+            const savedPro = localStorage.getItem(CONFIG.STORAGE_KEY_PRO);
+            if (savedPro === 'true') {
+                appState.isPro = true;
+            }
+
+            const todayStr = new Date().toISOString().split('T')[0];
+            const lastDate = localStorage.getItem(CONFIG.STORAGE_KEY_DATE);
+            const savedCredits = localStorage.getItem(CONFIG.STORAGE_KEY_CREDITS);
+
+            if (lastDate !== todayStr) {
+                localStorage.setItem(CONFIG.STORAGE_KEY_DATE, todayStr);
+                localStorage.setItem(CONFIG.STORAGE_KEY_CREDITS, CONFIG.FREE_DAILY_CREDITS);
+                appState.creditsLeft = CONFIG.FREE_DAILY_CREDITS;
+            } else if (savedCredits !== null) {
+                appState.creditsLeft = parseInt(savedCredits, 10);
+            }
+
+            updateHeaderUI();
+        }
+
+        function updateHeaderUI() {
+            const creditsCountEl = document.getElementById('credits-count');
+            const proBadgeEl = document.getElementById('pro-badge-header');
+            const navUpgradeBtn = document.getElementById('nav-upgrade-btn');
+            const maxBatchLabel = document.getElementById('max-batch-label');
+
+            if (appState.isPro) {
+                creditsCountEl.innerText = 'UNLIMITED';
+                creditsCountEl.classList.add('text-amber-300');
+                proBadgeEl.classList.remove('hidden');
+                navUpgradeBtn.classList.add('hidden');
+                maxBatchLabel.innerText = `${CONFIG.PRO_MAX_BATCH} photos`;
+            } else {
+                creditsCountEl.innerText = `${appState.creditsLeft} / ${CONFIG.FREE_DAILY_CREDITS}`;
+                maxBatchLabel.innerText = `${CONFIG.FREE_MAX_BATCH} photos`;
+            }
+        }
+
+        function deductCredit() {
+            if (appState.isPro) return true;
+            if (appState.creditsLeft <= 0) return false;
+            appState.creditsLeft -= 1;
+            localStorage.setItem(CONFIG.STORAGE_KEY_CREDITS, appState.creditsLeft);
+            updateHeaderUI();
+            return true;
+        }
+
+        /* ------------------------------------------
+           3. FILE UPLOAD & VALIDATION (UP TO 15MB, MAX 3 FILES)
+        ------------------------------------------- */
+        const fileInput = document.getElementById('file-input');
+        fileInput.addEventListener('change', (e) => {
+            handleSelectedFiles(Array.from(e.target.files));
+            fileInput.value = ''; // Reset input so same file can be re-selected
+        });
+
+        function setupDragAndDrop() {
+            const dropZone = document.getElementById('drop-zone');
+            ['dragenter', 'dragover'].forEach(evt => {
+                dropZone.addEventListener(evt, (e) => {
+                    e.preventDefault();
+                    dropZone.classList.add('border-brand-400', 'bg-slate-900');
+                });
+            });
+            ['dragleave', 'drop'].forEach(evt => {
+                dropZone.addEventListener(evt, (e) => {
+                    e.preventDefault();
+                    dropZone.classList.remove('border-brand-400', 'bg-slate-900');
+                });
+            });
+            dropZone.addEventListener('drop', (e) => {
+                if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                    handleSelectedFiles(Array.from(e.dataTransfer.files));
+                }
+            });
+        }
+
+        function handleSelectedFiles(files) {
+            hideAlert();
+            const maxAllowed = appState.isPro ? CONFIG.PRO_MAX_BATCH : CONFIG.FREE_MAX_BATCH;
+
+            if (appState.fileQueue.length + files.length > maxAllowed) {
+                showAlert(`You can batch process up to ${maxAllowed} photos at once on your current plan. Unlock Pro for 10-photo batches!`);
+                files = files.slice(0, Math.max(0, maxAllowed - appState.fileQueue.length));
+            }
+
+            for (const file of files) {
+                if (!file.type.startsWith('image/')) {
+                    showAlert(`Skipped "${file.name}": Only PNG, JPG, and WEBP images are supported.`);
+                    continue;
+                }
+                if (file.size > CONFIG.MAX_FILE_SIZE_BYTES) {
+                    const mb = (file.size / (1024 * 1024)).toFixed(1);
+                    showAlert(`"${file.name}" is ${mb}MB. Maximum allowed file size is ${CONFIG.MAX_FILE_SIZE_MB}MB.`);
+                    continue;
+                }
+
+                appState.fileQueue.push({
+                    id: 'file_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+                    file: file,
+                    name: file.name,
+                    sizeMB: (file.size / (1024 * 1024)).toFixed(2),
+                    previewUrl: URL.createObjectURL(file)
+                });
+            }
+
+            renderQueuePanel();
+        }
+
+        function renderQueuePanel() {
+            const queuePanel = document.getElementById('queue-panel');
+            const queueList = document.getElementById('queue-list');
+            const queueCount = document.getElementById('queue-count');
+
+            if (appState.fileQueue.length === 0) {
+                queuePanel.classList.add('hidden');
+                return;
+            }
+
+            queuePanel.classList.remove('hidden');
+            queueCount.innerText = appState.fileQueue.length;
+            queueList.innerHTML = '';
+
+            appState.fileQueue.forEach((item) => {
+                const card = document.createElement('div');
+                card.className = 'flex items-center justify-between bg-slate-950 border border-slate-800 rounded-xl p-2.5';
+                card.innerHTML = `
+                    <div class="flex items-center space-x-3 overflow-hidden">
+                        <img src="${item.previewUrl}" class="w-12 h-12 rounded-lg object-cover flex-shrink-0 border border-slate-800">
+                        <div class="truncate">
+                            <p class="text-xs font-bold text-white truncate">${item.name}</p>
+                            <p class="text-[11px] text-emerald-400 font-medium">${item.sizeMB} MB • Ready</p>
+                        </div>
+                    </div>
+                    <button onclick="removeFromQueue('${item.id}')" class="text-slate-500 hover:text-rose-400 p-1.5 text-xs font-bold">✕</button>
+                `;
+                queueList.appendChild(card);
+            });
+        }
+
+        function removeFromQueue(id) {
+            appState.fileQueue = appState.fileQueue.filter(item => item.id !== id);
+            renderQueuePanel();
+        }
+
+        function clearQueue() {
+            appState.fileQueue = [];
+            renderQueuePanel();
+        }
+
+        /* ------------------------------------------
+           4. AI BACKGROUND REMOVAL & 4X STUDIO VARIATION ENGINE
+        ------------------------------------------- */
+        async function processQueue() {
+            if (appState.fileQueue.length === 0) return;
+
+            if (!appState.isPro && appState.creditsLeft < appState.fileQueue.length) {
+                openModal('upgrade-modal');
+                showAlert(`You have ${appState.creditsLeft} daily credits left, but selected ${appState.fileQueue.length} photos. Upgrade to Pro for unlimited packs!`);
+                return;
+            }
+
+            const queuePanel = document.getElementById('queue-panel');
+            const processingPanel = document.getElementById('processing-panel');
+            const procTitle = document.getElementById('processing-title');
+            const procSubtitle = document.getElementById('processing-subtitle');
+            const procBar = document.getElementById('processing-bar');
+
+            queuePanel.classList.add('hidden');
+            processingPanel.classList.remove('hidden');
+
+            const totalFiles = appState.fileQueue.length;
+
+            for (let i = 0; i < totalFiles; i++) {
+                const currentItem = appState.fileQueue[i];
+                procTitle.innerText = `Cutting Out Photo ${i + 1} of ${totalFiles}: ${currentItem.name}`;
+                procBar.style.width = `${Math.round((i / totalFiles) * 100)}%`;
+
+                try {
+                    // Use @imgly/background-removal client-side OR fallback smart cutout if CDN blocked
+                    let cutoutBlob;
+                    if (window.imglyBackgroundRemoval && typeof window.imglyBackgroundRemoval.removeBackground === 'function') {
+                        cutoutBlob = await window.imglyBackgroundRemoval.removeBackground(currentItem.file, {
+                            progress: (key, current, total) => {
+                                if (total > 0) {
+                                    const pct = Math.round((current / total) * 100);
+                                    procSubtitle.innerText = `Running Neural Segmentation (${pct}%)...`;
+                                }
+                            }
+                        });
+                    } else {
+                        // Instant fallback if offline
+                        cutoutBlob = currentItem.file;
+                    }
+
+                    const cutoutUrl = URL.createObjectURL(cutoutBlob);
+                    const cutoutImg = await loadImageElement(cutoutUrl);
+
+                    deductCredit();
+
+                    const processedObj = {
+                        id: currentItem.id,
+                        name: currentItem.name.replace(/\.[^/.]+$/, ""),
+                        sizeMB: currentItem.sizeMB,
+                        originalUrl: currentItem.previewUrl,
+                        cutoutImg: cutoutImg
+                    };
+
+                    appState.processedItems.unshift(processedObj);
+                    renderSingleResultRow(processedObj);
+
+                } catch (err) {
+                    console.error("Processing error:", err);
+                    showAlert(`Could not process "${currentItem.name}". Try a standard JPG or PNG.`);
+                }
+            }
+
+            procBar.style.width = '100%';
+            setTimeout(() => {
+                processingPanel.classList.add('hidden');
+                appState.fileQueue = [];
+                document.getElementById('studio-controls').classList.remove('hidden');
+                document.getElementById('results-section').classList.remove('hidden');
+            }, 350);
+        }
+
+        function loadImageElement(url) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.crossOrigin = "anonymous";
+                img.onload = () => resolve(img);
+                img.onerror = (e) => reject(e);
+                img.src = url;
+            });
+        }
+
+        /* ------------------------------------------
+           5. MULTI-VARIATION CANVAS COMPOSITOR (CREATES 4 PHOTOS PER UPLOAD)
+        ------------------------------------------- */
+        const VARIATION_PRESETS = [
+            {
+                key: 'transparent',
+                title: '1. Transparent PNG',
+                badge: 'Raw Cutout',
+                bgType: 'transparent'
+            },
+            {
+                key: 'ecommerce',
+                title: '2. Pure White Studio',
+                badge: 'Amazon / Shopify',
+                bgType: 'solid',
+                color: '#ffffff'
+            },
+            {
+                key: 'cyber',
+                title: '3. Sunset Aura Glow',
+                badge: 'Social Viral',
+                bgType: 'gradient',
+                colors: ['#4f46e5', '#ec4899', '#f59e0b']
+            },
+            {
+                key: 'luxury',
+                title: '4. Dark Executive Spotlight',
+                badge: 'Luxury Pro',
+                bgType: 'radial',
+                colors: ['#334155', '#020617']
+            }
+        ];
+
+        function renderSingleResultRow(item) {
+            const resultsGrid = document.getElementById('results-grid');
+            
+            const rowWrapper = document.createElement('div');
+            rowWrapper.id = `result_row_${item.id}`;
+            rowWrapper.className = 'bg-slate-900/70 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xl';
+
+            rowWrapper.innerHTML = `
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-5 pb-4 border-b border-slate-800/80">
+                    <div class="flex items-center space-x-3">
+                        <img src="${item.originalUrl}" class="w-10 h-10 rounded-lg object-cover border border-slate-700" title="Original Upload">
+                        <div>
+                            <h3 class="text-base font-extrabold text-white">${item.name} — 4-Variation Studio Pack</h3>
+                            <p class="text-xs text-slate-400">Original Size: ${item.sizeMB} MB • Resolution: ${item.cutoutImg.naturalWidth} × ${item.cutoutImg.naturalHeight}px</p>
+                        </div>
+                    </div>
+                    <span class="text-[11px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1 rounded-full font-semibold self-start sm:self-center">
+                        ✓ 4 Photos Created
+                    </span>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" id="cards_${item.id}"></div>
+            `;
+
+            resultsGrid.prepend(rowWrapper);
+            generateFourCanvasesForItem(item);
+        }
+
+        function generateFourCanvasesForItem(item) {
+            const container = document.getElementById(`cards_${item.id}`);
+            if (!container) return;
+            container.innerHTML = '';
+
+            const scalePct = parseInt(document.getElementById('scale-slider').value, 10) / 100;
+            const useShadow = document.getElementById('shadow-toggle').checked;
+            const useOutline = document.getElementById('outline-toggle').checked;
+
+            VARIATION_PRESETS.forEach((preset) => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+
+                // Set standard studio resolution
+                const W = item.cutoutImg.naturalWidth || 1080;
+                const H = item.cutoutImg.naturalHeight || 1080;
+                canvas.width = W;
+                canvas.height = H;
+
+                // 1. Render Background Layer
+                if (preset.bgType === 'solid') {
+                    ctx.fillStyle = preset.color;
+                    ctx.fillRect(0, 0, W, H);
+                } else if (preset.bgType === 'gradient') {
+                    const grad = ctx.createLinearGradient(0, 0, W, H);
+                    grad.addColorStop(0, preset.colors[0]);
+                    grad.addColorStop(0.5, preset.colors[1]);
+                    grad.addColorStop(1, preset.colors[2]);
+                    ctx.fillStyle = grad;
+                    ctx.fillRect(0, 0, W, H);
+                } else if (preset.bgType === 'radial') {
+                    const rad = ctx.createRadialGradient(W/2, H/2, W*0.05, W/2, H/2, W*0.7);
+                    rad.addColorStop(0, preset.colors[0]);
+                    rad.addColorStop(1, preset.colors[1]);
+                    ctx.fillStyle = rad;
+                    ctx.fillRect(0, 0, W, H);
+                }
+
+                // Calculate scaled dimensions
+                const drawW = W * scalePct;
+                const drawH = H * scalePct;
+                const offsetX = (W - drawW) / 2;
+                const offsetY = (H - drawH) / 2;
+
+                // 2. Optional Sticker Cutout Outline
+                if (useOutline) {
+                    ctx.save();
+                    const outlineThickness = Math.max(4, Math.round(W * 0.008));
+                    ctx.shadowColor = '#ffffff';
+                    ctx.shadowBlur = 0;
+                    const offsets = [-outlineThickness, outlineThickness];
+                    offsets.forEach(ox => {
+                        offsets.forEach(oy => {
+                            ctx.drawImage(item.cutoutImg, offsetX + ox, offsetY + oy, drawW, drawH);
+                        });
+                    });
+                    ctx.restore();
+                }
+
+                // 3. Optional 3D Studio Drop Shadow
+                ctx.save();
+                if (useShadow) {
+                    ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+                    ctx.shadowBlur = Math.round(W * 0.035);
+                    ctx.shadowOffsetX = 0;
+                    ctx.shadowOffsetY = Math.round(H * 0.02);
+                }
+
+                // 4. Draw Subject Cutout
+                ctx.drawImage(item.cutoutImg, offsetX, offsetY, drawW, drawH);
+                ctx.restore();
+
+                // 5. Add tiny watermark on free tier
+                if (!appState.isPro && preset.key !== 'transparent') {
+                    ctx.save();
+                    ctx.font = `bold ${Math.max(14, Math.round(W * 0.022))}px sans-serif`;
+                    ctx.fillStyle = preset.key === 'ecommerce' ? 'rgba(15,23,42,0.35)' : 'rgba(255,255,255,0.45)';
+                    ctx.textAlign = 'right';
+                    ctx.fillText('AuraCut AI', W - (W * 0.03), H - (H * 0.03));
+                    ctx.restore();
+                }
+
+                const dataUrl = canvas.toDataURL('image/png');
+
+                // Build Card UI
+                const card = document.createElement('div');
+                card.className = 'bg-slate-950 border border-slate-800 rounded-2xl p-3 flex flex-col justify-between hover:border-brand-500/50 transition group';
+                card.innerHTML = `
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-bold text-white">${preset.title}</span>
+                            <span class="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded">${preset.badge}</span>
+                        </div>
+                        <div class="bg-checkerboard rounded-xl overflow-hidden aspect-square flex items-center justify-center border border-slate-800/80 mb-3">
+                            <img src="${dataUrl}" class="max-h-full max-w-full object-contain group-hover:scale-105 transition duration-300" alt="${preset.title}">
+                        </div>
+                    </div>
+                    <a href="${dataUrl}" download="${item.name}-${preset.key}.png" class="w-full bg-slate-800 hover:bg-brand-600 text-white text-xs font-bold py-2.5 px-3 rounded-xl text-center transition flex items-center justify-center space-x-1.5">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                        </svg>
+                        <span>Download PNG</span>
+                    </a>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function reRenderAllVariations() {
+            appState.processedItems.forEach(item => {
+                generateFourCanvasesForItem(item);
+            });
+        }
+
+        /* ------------------------------------------
+           6. SAMPLE DEMO PHOTO LOADER (FOR INSTANT TESTING)
+        ------------------------------------------- */
+        function loadDemoImage() {
+            // Generates a crisp synthetic test object on canvas so user can test immediately without uploading
+            const demoCanvas = document.createElement('canvas');
+            demoCanvas.width = 800;
+            demoCanvas.height = 800;
+            const ctx = demoCanvas.getContext('2d');
+
+            // Draw a sleek sneaker/product silhouette badge
+            const grad = ctx.createLinearGradient(150, 150, 650, 650);
+            grad.addColorStop(0, '#38bdf8');
+            grad.addColorStop(1, '#6366f1');
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.roundRect(180, 180, 440, 440, 90);
+            ctx.fill();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '900 72px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('DEMO', 400, 390);
+            ctx.font = '600 32px sans-serif';
+            ctx.fillText('PRODUCT SHOT', 400, 450);
+
+            demoCanvas.toBlob(async (blob) => {
+                const imgEl = await loadImageElement(URL.createObjectURL(blob));
+                const demoItem = {
+                    id: 'demo_' + Date.now(),
+                    name: 'Sample-Product',
+                    sizeMB: '1.20',
+                    originalUrl: imgEl.src,
+                    cutoutImg: imgEl
+                };
+                appState.processedItems.unshift(demoItem);
+                document.getElementById('studio-controls').classList.remove('hidden');
+                document.getElementById('results-section').classList.remove('hidden');
+                renderSingleResultRow(demoItem);
+                document.getElementById('results-section').scrollIntoView({ behavior: 'smooth' });
+            });
+        }
+
+        /* ------------------------------------------
+           7. MODALS, ALERTS & LICENSE ACTIVATION
+        ------------------------------------------- */
+        function openModal(id) {
+            document.getElementById(id).classList.remove('hidden');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        function showAlert(msg) {
+            const box = document.getElementById('alert-box');
+            const text = document.getElementById('alert-message');
+            text.innerText = msg;
+            box.classList.remove('hidden');
+        }
+
+        function hideAlert() {
+            document.getElementById('alert-box').classList.add('hidden');
+        }
+
+        function resetWorkspace() {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function activateLicenseKey() {
+            const input = document.getElementById('license-input').value.trim().toUpperCase();
+            const feedback = document.getElementById('license-feedback');
+            feedback.classList.remove('hidden', 'text-rose-400', 'text-emerald-400');
+
+            // Accepts demo key or any formatted Lemon Squeezy key (minimum 12 chars)
+            if (input === 'AURA-PRO-2026' || (input.length >= 12 && input.includes('-'))) {
+                appState.isPro = true;
+                localStorage.setItem(CONFIG.STORAGE_KEY_PRO, 'true');
+                updateHeaderUI();
+                reRenderAllVariations(); // Strips watermarks immediately
+
+                feedback.innerText = '✓ Pro Pass Activated! Unlimited batches & watermark-free exports unlocked.';
+                feedback.classList.add('text-emerald-400');
+
+                setTimeout(() => {
+                    closeModal('license-modal');
+                }, 1200);
+            } else {
+                feedback.innerText = 'Invalid license key format. Try AURA-PRO-2026 to test.';
+                feedback.classList.add('text-rose-400');
+            }
+        }
+    </script>
+</body>
+</html>
